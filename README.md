@@ -17,8 +17,8 @@ A containerized Flask application for searching and retrieving GitHub Security A
 ### Using Docker
 1. Clone the repository:
    ```
-   git clone <repository-url>
-   cd <repository-directory>
+   git clone https://github.com/arnabroy24/software-security.git
+   cd software-security
    ```
 
 2. Build the Docker image:

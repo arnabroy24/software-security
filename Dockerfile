@@ -15,6 +15,5 @@ EXPOSE 5000
 
 ENTRYPOINT ["/bin/bash", "/app/entrypoint.sh"]
 
-CMD ["python","backend.py"]
 
 

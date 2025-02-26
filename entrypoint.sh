@@ -9,4 +9,6 @@ service cron start
 
 python /app/process-info.py
 
-python /app/backend.py
+python /app/backend.py &
+
+wait

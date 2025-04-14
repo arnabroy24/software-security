@@ -62,7 +62,7 @@ jobs:
         uses: zaproxy/action-baseline@v0.9.0
         with:
           target: 'http://localhost:5000/api/advisories/GHSA-vrq4-9hc3-cgp7'
-          allow_issue_writing: false
+          allow_issue_writing: true
           cmd_options: '-a -J report_json.json -w report_md.md -r report_html.html'
 
       - name: Upload ZAP report as artifact

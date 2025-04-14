@@ -73,7 +73,7 @@ jobs:
           target: 'http://localhost:5000/api/advisories/GHSA-vrq4-9hc3-cgp7'
           allow_issue_writing: false
           cmd_options: '-a'
-      
+          artifact_name: zap_scan
       - name: Upload ZAP report as artifact
         uses: actions/upload-artifact@v4
         with:

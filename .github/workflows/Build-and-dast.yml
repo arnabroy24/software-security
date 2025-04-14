@@ -3,6 +3,9 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '0 2 * * *'  # 2:00 AM UTC daily
+permissions:
+  contents: read
+  issues: write
 jobs:
   docker-zap:
     runs-on: ubuntu-latest

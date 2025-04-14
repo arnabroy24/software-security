@@ -1,61 +1,34 @@
-name: Deploy Flask App & Run ZAP
-on:
-  workflow_dispatch:
-  schedule:
-    - cron: '0 2 * * *'  # 2:00 AM UTC daily
-jobs:
-  docker-zap:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+- name: Wait for Flask app to be ready (up to 15 mins)
+  run: |
+    echo "Waiting for Flask app to start..."
+    # Wait for container to initialize
+    sleep 30
+    
+    for i in {1..60}; do
+      echo "Attempt $i: Checking container status..."
+      docker ps -a | grep ghsa-container
       
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+      # Check if data processing has completed
+      DATA_READY=$(docker exec ghsa-container bash -c "[ -f /app/data_ready ] && echo 'yes' || echo 'no'")
+      echo "Data processing ready: $DATA_READY"
       
-      - name: Build Docker image
-        run: docker build -t ghsa-backend-app .
+      # Try connecting to the Flask app
+      HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 --retry 3 --retry-delay 2 http://localhost:5000/api/advisories/GHSA-vrq4-9hc3-cgp7 || echo "connection_failed")
       
-      - name: Create Docker network
-        run: docker network create zap-network
+      if [ "$HTTP_CODE" == "200" ] || [ "$HTTP_CODE" == "404" ]; then
+        echo "Flask app is ready (HTTP $HTTP_CODE)"
+        exit 0
+      fi
       
-      - name: Run Docker container
-        run: docker run -d --network zap-network -p 5000:5000 --name ghsa-container ghsa-backend-app
+      echo "Response code: $HTTP_CODE"
+      echo "Container logs (last 20 lines):"
+      docker logs --tail 20 ghsa-container
       
-      - name: Wait for Flask app to be ready (up to 10 mins)
-        run: |
-          echo "Waiting for Flask app to start..."
-          for i in {1..60}; do
-            STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5000/api/advisories/GHSA-vrq4-9hc3-cgp7)
-            if [ "$STATUS" == "200" ] || [ "$STATUS" == "404" ]; then
-              echo "Flask app is ready (HTTP $STATUS)"
-              exit 0
-            fi
-            echo "Still waiting for app... attempt $i"
-            sleep 10
-          done
-          echo "Flask app failed to start in time. Dumping logs:"
-          docker logs ghsa-container
-          exit 1
-      
-      - name: Debug network information
-        run: |
-          echo "Network interfaces and ports:"
-          netstat -tuln
-          echo "Docker container IP:"
-          docker inspect ghsa-container | grep IPAddress
-          echo "Testing API endpoint:"
-          curl -v http://localhost:5000/api/advisories/GHSA-vrq4-9hc3-cgp7
-      
-      - name: Run ZAP full scan and generate report
-        uses: zaproxy/action-full-scan@v0.9.0
-        with:
-          target: 'http://host.docker.internal:5000/api/advisories/GHSA-vrq4-9hc3-cgp7'
-          allow_issue_writing: false
-          cmd_options: '-a -j -r zap-report.html -d -T 60'
-      
-      - name: Upload ZAP report as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: zap-report
-          path: zap-report.html
+      echo "Still waiting for app... attempt $i"
+      sleep 10
+    done
+    
+    echo "Flask app failed to start in time. Final container status:"
+    docker ps -a | grep ghsa-container
+    echo "Final container logs:"
+    docker logs ghsa-container

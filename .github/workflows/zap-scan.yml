@@ -1,0 +1,31 @@
+name: ZAP Full Scan
+
+on:
+  workflow_dispatch: # Allows manual trigger
+  schedule:
+    - cron: '0 0 * * 0' # Runs weekly on Sunday at midnight UTC
+
+jobs:
+  zap_scan:
+    runs-on: ubuntu-latest
+    name: Run ZAP Full Scan
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run ZAP Full Scan
+        uses: zaproxy/action-full-scan@v0.12.0
+        with:
+          target: 'https://www.zaproxy.org/'
+          # Optional parameters for enhanced control:
+          # cmd_options: '-a' # Add aggressive scan mode
+          # fail_action: true # Fail the job if vulnerabilities are found
+          # token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload ZAP Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-scan-report
+          path: report_html.html

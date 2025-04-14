@@ -65,5 +65,18 @@ jobs:
           curl -v http://localhost:5000/api/advisories/GHSA-vrq4-9hc3-cgp7
           echo "Port bindings:"
           docker port ghsa-container
-      
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.GH_DOCKER }}" | docker login -u "${{ secrets.GH_DOCKER_USERNAME }}" --password-stdin
+      - name: ZAP Scan
+        uses: zaproxy/action-full-scan@v0.12.0
+        with:
+          target: 'http://localhost:5000/api/advisories/GHSA-vrq4-9hc3-cgp7'
+      - name: Upload ZAP Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-scan-report
+          path: report_html.html
      

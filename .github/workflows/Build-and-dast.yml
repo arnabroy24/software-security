@@ -2,6 +2,8 @@ name: Deploy Flask App & Run ZAP
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'  # 2:00 AM UTC daily
 
 jobs:
   docker-zap:
@@ -20,20 +22,28 @@ jobs:
       - name: Run Docker container
         run: docker run -d -p 5000:5000 --name ghsa-container ghsa-backend-app
 
-      - name: Wait for Flask app to be ready
+      - name: Wait for Flask app to be ready (up to 10 mins)
         run: |
-          echo "Waiting for Flask app..."
-          for i in {1..10}; do
-            curl -s http://localhost:5000/api/advisories/GHSA-vrq4-9hc3-cgp7 && break
-            sleep 5
+          echo "Waiting for Flask app to start..."
+          for i in {1..60}; do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5000/api/advisories/test)
+            if [ "$STATUS" == "200" ] || [ "$STATUS" == "404" ]; then
+              echo "Flask app is ready (HTTP $STATUS)"
+              exit 0
+            fi
+            echo "Still waiting for app... attempt $i"
+            sleep 10
           done
+          echo "Flask app failed to start in time. Dumping logs:"
+          docker logs ghsa-container
+          exit 1
 
       - name: Run ZAP full scan and generate report
         uses: zaproxy/action-full-scan@v0.8.0
         with:
-          target: 'http://localhost:5000/api/advisories/GHSA-vrq4-9hc3-cgp7'
+          target: 'http://localhost:5000/api/advisories/test'
           allow_issue_writing: false
-          cmd_options: '-a -j -r zap-report.html'
+          cmd_options: '-a -j -r zap-report.html -d'
 
       - name: Upload ZAP report as artifact
         uses: actions/upload-artifact@v4

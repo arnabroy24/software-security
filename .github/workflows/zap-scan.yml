@@ -13,7 +13,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.GH_DOCKER }}" | docker login -u "${{ secrets.GH_DOCKER_USERNAME }}" --password-stdin
       - name: ZAP Scan
         uses: zaproxy/action-full-scan@v0.12.0
         with:

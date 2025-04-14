@@ -26,7 +26,7 @@ jobs:
         run: |
           echo "Waiting for Flask app to start..."
           for i in {1..60}; do
-            STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5000/api/advisories/test)
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5000/api/advisories/GHSA-vrq4-9hc3-cgp7)
             if [ "$STATUS" == "200" ] || [ "$STATUS" == "404" ]; then
               echo "Flask app is ready (HTTP $STATUS)"
               exit 0
@@ -41,7 +41,7 @@ jobs:
       - name: Run ZAP full scan and generate report
         uses: zaproxy/action-full-scan@v0.8.0
         with:
-          target: 'http://localhost:5000/api/advisories/test'
+          target: 'http://localhost:5000/api/advisories/GHSA-vrq4-9hc3-cgp7'
           allow_issue_writing: false
           cmd_options: '-a -j -r zap-report.html -d'
 

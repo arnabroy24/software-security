@@ -1,81 +1,75 @@
 name: Deploy Flask App & Run ZAP
+
 on:
   workflow_dispatch:
   schedule:
     - cron: '0 2 * * *'  # 2:00 AM UTC daily
+
 jobs:
   docker-zap:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      
+
       - name: Build Docker image
         run: docker build -t ghsa-backend-app .
-      
+
       - name: Run Docker container
         run: docker run -d -p 5000:5000 --name ghsa-container ghsa-backend-app
-      
+
       - name: Wait for Flask app to be ready (up to 15 mins)
         run: |
           echo "Waiting for Flask app to start..."
-          # Wait for container to initialize
           sleep 30
-          
           for i in {1..60}; do
             echo "Attempt $i: Checking container status..."
             docker ps -a | grep ghsa-container
-            
-            # Check if data processing has completed
+
             DATA_READY=$(docker exec ghsa-container bash -c "[ -f /app/data_ready ] && echo 'yes' || echo 'no'" || echo "exec_failed")
             echo "Data processing ready: $DATA_READY"
-            
-            # Try connecting to the Flask app with improved reliability
+
             HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 --retry 3 --retry-delay 2 http://localhost:5000/api/advisories/GHSA-vrq4-9hc3-cgp7 || echo "connection_failed")
-            
+
             if [ "$HTTP_CODE" == "200" ] || [ "$HTTP_CODE" == "404" ]; then
               echo "Flask app is ready (HTTP $HTTP_CODE)"
               exit 0
             fi
-            
+
             echo "Response code: $HTTP_CODE"
-            echo "Container logs (last 20 lines):"
             docker logs --tail 20 ghsa-container
-            
             echo "Still waiting for app... attempt $i"
             sleep 10
           done
-          
+
           echo "Flask app failed to start in time. Final container status:"
           docker ps -a | grep ghsa-container
-          echo "Final container logs:"
           docker logs ghsa-container
-      
-      # Network diagnostics before ZAP scan
+          exit 1
+
       - name: Network diagnostics
         run: |
-          echo "Docker network information:"
           docker network ls
-          echo "Container IP:"
           docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ghsa-container
-          echo "Testing endpoint:"
           curl -v http://localhost:5000/api/advisories/GHSA-vrq4-9hc3-cgp7
-          echo "Port bindings:"
           docker port ghsa-container
-      
-      # Replace full scan with baseline scan
+
       - name: Run ZAP baseline scan
         uses: zaproxy/action-baseline@v0.9.0
         with:
           target: 'http://localhost:5000/api/advisories/GHSA-vrq4-9hc3-cgp7'
           allow_issue_writing: false
-          cmd_options: '-a'
-          artifact_name: zap_scan
+          cmd_options: '-a -J report_json.json -w report_md.md -r report_html.html'
+
       - name: Upload ZAP report as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: zap-report
-          path: zap-report.html
+          name: zap_report
+          path: |
+            report_html.html
+            report_json.json
+            report_md.md
